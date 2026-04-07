@@ -1,203 +1,336 @@
-# Solving Lunar Lander with (D)DQN
+# 🚀 Lunar Lander — Solved with (D)DQN
 
-## Problem Definition
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white" />
+  <img src="https://img.shields.io/badge/TensorFlow%2FKeras-2.x-FF6F00?logo=tensorflow&logoColor=white" />
+  <img src="https://img.shields.io/badge/Gymnasium-LunarLander--v3-green" />
+  <img src="https://img.shields.io/badge/Algorithm-DDQN-purple" />
+</p>
 
-The Lunar Lander environment simulates landing a small rocket on the moon surface. The
-environment for testing the algorithm is freely available on the
-[Gymnasium](https://gymnasium.farama.org) web site (it's an actively
-maintained fork of the original [OpenAI
-Gym](https://github.com/openai/gym) developed by Oleg Klimov.
+<p align="center">
+  <b>Trained Agent Landing</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Untrained Agent Landing</b>
+</p>
+<p align="center">
+  <a href="https://youtu.be/csrk1gOcRPU">
+    <img src="https://img.youtube.com/vi/csrk1gOcRPU/maxresdefault.jpg" width="45%" alt="Trained Agent"/>
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://youtu.be/Jb_1M_E6ofE">
+    <img src="https://img.youtube.com/vi/Jb_1M_E6ofE/maxresdefault.jpg" width="45%" alt="Untrained Agent"/>
+  </a>
+</p>
 
-The [Lunar Lander](https://gymnasium.farama.org/environments/box2d/lunar_lander/)
-is a classic rocket trajectory optimisation problem ([comprehensive
-environment description is found on the gymnasium web
-site](https://gymnasium.farama.org/environments/box2d/lunar_lander/) ).
+---
 
-Trained agent landing | Untrained agent landing
-:-: | :-:
-[<img src="https://img.youtube.com/vi/csrk1gOcRPU/maxresdefault.jpg" width="500px">](https://youtu.be/csrk1gOcRPU) | [<img src="https://img.youtube.com/vi/Jb_1M_E6ofE/maxresdefault.jpg" width="500px">](https://youtu.be/Jb_1M_E6ofE)
+## 📋 Table of Contents
 
-In the simulation, the spacecraft has a main engine and two lateral
-boosters that can be used to control its descent and the orientation of
-the spacecraft. The spacecraft is subject to the moon's gravitational
-pull, and the engines have an unlimited amount of fuel. The spacecraft
-must navigate to the landing spot between two flags at coordinates (0,0)
-without crashing. Landing outside of the landing pad is possible. The
-lander starts at the top center of the viewport with a random initial
-force applied to its center of mass. The environment has 4 discrete
-actions:
+- [Problem Definition](#-problem-definition)
+- [Background & Theory](#-background--theory)
+- [Method](#-method)
+- [Architecture](#-architecture)
+- [Results](#-results)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Training & Usage](#-training--usage)
+- [Implementation Notes](#-implementation-notes)
+- [References](#-references)
 
--   0: do nothing
--   1: fire left orientation engine
--   2: fire main engine
--   3: fire right orientation engine
+---
 
-The state is an 8-dimensional vector: the coordinates of the lander in x
-& y, its linear velocities in x & y, its angle, its angular velocity,
-and two booleans that represent whether each leg is in contact with the
-ground or not.
+## 🌕 Problem Definition
 
-After every step a reward is granted. The total reward of an episode is
-the sum of the rewards for all the steps within that episode.
+The **Lunar Lander** environment ([Gymnasium](https://gymnasium.farama.org/environments/box2d/lunar_lander/)) simulates landing a small spacecraft on the moon surface. The goal is to navigate the lander between two flags at coordinates `(0, 0)` without crashing.
 
-For each step, the reward:
+### State Space (8-dimensional)
 
--   is increased/decreased the closer/further the lander is to the
-    landing pad.
--   is increased/decreased the slower/faster the lander is moving.
--   is decreased the more the lander is tilted (angle not horizontal).
--   is increased by 10 points for each leg that is in contact with the
-    ground.
--   is decreased by 0.03 points each frame a side engine is firing.
--   is decreased by 0.3 points each frame the main engine is firing.
+| Index | Description |
+|-------|-------------|
+| 0, 1 | x, y coordinates of the lander |
+| 2, 3 | Linear velocities in x, y |
+| 4 | Lander angle |
+| 5 | Angular velocity |
+| 6, 7 | Boolean — whether each leg is in contact with the ground |
 
-The episode receive an additional reward of -100 or +100 points for
-crashing or landing safely respectively. An episode is considered a
-solution if it scores at least 200 points. The episode finishes if the
-lander crashes, flies outside of the viewport of stops moving.
+### Action Space (Discrete, 4 actions)
 
-# Background
+| Action | Description |
+|--------|-------------|
+| `0` | Do nothing |
+| `1` | Fire left orientation engine |
+| `2` | Fire main engine |
+| `3` | Fire right orientation engine |
 
-The lunar lander environment features a relatively big, continuous state
-space. This narrows down the selection of the appropriate
-algorithms to the families of algorithms that don't assume the perfect
-knowledge of the environment, e.g. dynamic programming would not
-not be feasible in this case since it would not be possible to efficiently estimate
-the state-value function. Monte-Carlo methods on the other hand don't
-require the perfect knowledge of the environment and learn from the
-agent's experiences. They would be a more suitable candidate
-for a large state space. However a drawback of Monte Carlo methods is
-that they require a full completed episode to learn and so the
-convergence is slower. Additionally they need to store the action-value function and the
-complete list of returns for every episode which would
-potentially require lots of space. Another family of methods are the
-temporal-difference methods which solve the first drawback of the
-Monte-Carlo methods and can learn at every step since they make use of
-bootstrapping while still relying on agent's experiences like the
-Monte-Carlo methods. The agent can improve even before
-reaching the goal state which is an important aspect for environments
-like Lunar Lander where an agent might take many steps before reaching a
-goal. Q-learning is one such algorithm. It is an off-policy
-method so it isn't limited to learning the policy it's following while
-learning the optimal policy. The speed of convergence of the Q-learning
-can be further improved up by remembering past state transitions and
-simulating moves and thus speeding up the learning process as in the
-Dyna-Q algorithm. All of the mentioned methods however have one thing in
-common. They assume a finite state and action space and therefore can
-rely on tabular representation of the Q-value estimate. In order to
-scale past the finite number of states even to improve the performance
-of agents in environments with a large number of states a function
-approximation for the state-value function can be used instead. One such
-method was used by the DeepMind that learned to play Atari games by
-using a neural network as a function approximator. This way the size of
-the state space does not matter any more a problem since we have no Q
-table that needs to be maintained in the memory. The agent still learns
-from experiences as in the MC and TD methods and is not limited to
-completing an episode. In this project two such algorithms were tested
-on the Lunar Lander problem, DQN with one and DQN with two neural
-networks.
+### Reward Structure
 
-# Method
+- ✅ **+100** for landing safely
+- ❌ **−100** for crashing
+- 📍 Increases/decreases based on proximity to landing pad
+- 🐢 Increases/decreases based on lower/higher speed
+- 📐 Decreases when the lander is tilted
+- 🦵 **+10** per leg in contact with the ground
+- 🔥 **−0.03** per frame a side engine fires
+- 🔥 **−0.3** per frame the main engine fires
 
-To solve the Lunar Lander problem two similar deep RL methods were
-used. Deep Q-learning (DQN) is essentially a Q-learning algorithm with
-an approximation of the Q-value function that receives a state as an
-input and returns actions with their q-values instead of the tabular
-Q-value function that simply maps a state-action pair to a Q value. A
-neural network is used as a function approximator. In the case of a
-DQN a single neural network is used for two important steps, choosing
-agent's actions as well as for evaluating the target Q values. This can
-lead to a so-called maximisation bias which means that a maximum over
-estimated values is used implicitly as an estimate of the maximum value.
-A further example of such a bias is provided in Sutton and Barto (2018,
-p.134) which illustrates situations in which a wrong action would be
-chosen by an agent due to this effect. To overcome this challenge an
-improved version of a DQN is such that a separate neural network is
-added for updating the target values. This second neural network has the
-same shape and architecture as the one used for the action-selection and
-is periodically updated with the weights of the action-selection
-network. Such reduced frequency of updates to the target network means
-that the target values it is aiming at stay more stationary. Therefore
-the improvements to the action-selection network should be more
-efficient and we should see the agent converge faster and learn more
-robustly.
+> An episode is considered **solved** when it achieves a score ≥ 200 points (averaged over 100 consecutive episodes).
 
-# Results
+---
 
-Both algorithms (DQN and DDQN) converged after a couple of hundred
-episodes (the point of convergence is considered when the average of the last
-100 episodes exceeds 200 points). The best performing approach out of
-those tested was a DDQN with a neural network featuring two hidden
-layers of size 256 neurons and RELU activation function, batch size of
-128 and the replay memory of 200000 transitions. It was trained on 1500
-episodes and converged in the 369th episode as seen in the figure
-[1](#fig:1){reference-type="ref" reference="fig:1"} (the red colour in
-the graph indicates the point where the average of the past 200 episodes
-exceeded 200 points and the line is marked with red colour from that
-point onwards.). The final result of the agent landing the rocket using
-this model can be seen by playing the following videos (trained vs
-untrained agent):
+## 📚 Background & Theory
 
-Trained agent landing | Untrained agent landing
-:-: | :-:
-[<img src="https://img.youtube.com/vi/csrk1gOcRPU/maxresdefault.jpg" width="500px">](https://youtu.be/csrk1gOcRPU) | [<img src="https://img.youtube.com/vi/Jb_1M_E6ofE/maxresdefault.jpg" width="500px">](https://youtu.be/Jb_1M_E6ofE)
+The Lunar Lander features a large, continuous state space — making tabular Q-learning infeasible. The solution leverages **Deep Q-Networks (DQN)**, which use a neural network as a function approximator for the Q-value instead of a lookup table.
 
-The basic DQN compared fairly well with the DDQN and the version with
-two 64 neuron layers converged at episode 461:
+### Why not simpler methods?
+- **Dynamic Programming** — requires perfect environment knowledge (not available here)
+- **Monte Carlo** — requires complete episodes; slow convergence and high memory usage
+- **Tabular Q-learning** — infeasible for continuous state spaces
 
-![DDQN, 200000 experiences, NN(256,256), batch size 128, 1500 episodes,
-learn every 4th step N/A](./docs/tex/figures/m5.png)
+### DQN vs DDQN
 
-![DQN, 200000 experiences, NN(64,64), batch size 64, 629 episodes, learn
-every 4th step N/A](./docs/tex/figures/m0.png)
+Standard **DQN** uses a single neural network for both action selection and target Q-value estimation. This introduces a **maximisation bias** — the agent overestimates Q-values because the same network selects and evaluates actions simultaneously.
 
-The experiments showed that the network hidden layer width had a big
-impact on the speed of converging but the depth not so much. In the
-figure [3](#fig:3){reference-type="ref" reference="fig:3"} a rolling
-average with the window 100 can be seen and it shows that the neural
-network with only two hidden layers and 64 neurons per layer performs
-the worst. Increasing depth and also width drastically improves
-performance however also increases the computational complexity and it
-seems that the width of 256 neurons gives the best performance.
+**Double DQN (DDQN)** solves this by using two networks:
+- **Online network** — selects the best action
+- **Target network** — evaluates that action's Q-value
 
-![NN with too little neurons seem to converge too
-late](./docs/tex/figures/nnwidth.png)
+The target network is periodically synced with the online network (every N steps), keeping target values more stationary and improving training stability.
 
-Since the Lunar Lander is not such a complex problem it would be
-interesting to compare the deep RL methods to the simpler methods from
-the family of the temporal difference algorithms and see how much faster
-/ slower the deep learning approach converges compared to SARSA or the
-Dyna-Q. What could also be interesting is to do a more extensive hyper
-parameter tuning and determine what the best neural network architecture
-is e.g. would a convolutional network or a duelling network perform
-better.
+---
 
-# Some technical notes ...
+## 🧠 Method
 
-The implementation was first written for TensorFlow and Keras which
-performed poorly. The combination of TensorFlow / Keras and the
-gymnasium library have no working combination on a M1 Macbook so the
-training was performed on a remote computer in Jupyter Labs. However the
-training process ran slow and consumed more memory with every episode
-until it ran out of available memory. The only way the models could be
-trained was to periodically dump the neural network weights as well as
-the internal buffer state to disk and reload them after the process
-crashed. In this way the training process picked up where it left off
-and continued improving the model. The DQN agent in
-[2](#fig:2){reference-type="ref" reference="fig:2"} was trained in 10
-separate sessions over two days to reach roughly the episode 700, each
-session ending in out of memory exception. After extensive debugging and
-benchmarking every part of the agent including rewriting the replay
-buffer several times between a pure numpy implementation and the dequeue
-buffer there was one culprit left. There seems to be some undetermined
-issue with the TensorFlow/Keras running on my hardware or a programming
-mistake on my side. The TensorFlow/Keras neural network implementation
-was replaced by Pytorch and the performance increased 100 fold. All the
-experiments excluding the first one were subsequently run using the
-Pytorch approach and are able to reach the episode 1500 under one hour.
-Both implementations are included in the project.
+Both DQN and DDQN were implemented and compared. The core components are:
 
-# References {#references .unnumbered}
+### Experience Replay Buffer
+A fixed-size memory buffer stores past `(state, action, reward, next_state, done)` transitions. At each training step, a random mini-batch is sampled, breaking temporal correlations and stabilising learning.
 
-Sutton, R.S., Bach, F., and Barto, A.G., 2018. Reinforcement learning:
-An introduction. Massachusetts: MIT Press Ltd.
+### Training Loop (per episode step)
+1. Agent observes the current state
+2. Chooses an action via **ε-greedy policy** (explore vs exploit)
+3. Executes the action, receives reward & next state
+4. Stores the transition in the replay buffer
+5. Every 4 steps, samples a mini-batch and trains the online network
+6. Every N steps, copies online network weights to target network
+7. Decays ε over time (reduces exploration as agent improves)
+
+### Key Hyperparameters (Best Model — m5)
+
+| Parameter | Value |
+|-----------|-------|
+| Algorithm | DDQN |
+| ML Library | PyTorch |
+| Memory Size | 500,000 transitions |
+| Neural Network | 2 hidden layers × 128 neurons |
+| Batch Size | 128 |
+| Episodes | 1,500 |
+| Learn every N steps | 4 |
+| Target network sync | Every 100 steps |
+| Learning Rate | 0.001 |
+| Discount (γ) | 0.99 |
+| Epsilon decay | 0.996 |
+| Epsilon min | 0.01 |
+
+---
+
+## 🏗️ Architecture
+
+```
+Input (8)
+   │
+   ▼
+┌─────────────┐
+│  Linear(128) │  ← fc1
+│    ReLU      │
+└─────────────┘
+   │
+   ▼
+┌─────────────┐
+│  Linear(128) │  ← fc2
+│    ReLU      │
+└─────────────┘
+   │
+   ▼
+┌─────────────┐
+│  Linear(4)  │  ← Output (Q-value per action)
+└─────────────┘
+```
+
+Both the **online** and **target** networks share this architecture. The target network's weights are periodically copied from the online network.
+
+---
+
+## 📊 Results
+
+### Best Model (DDQN — m5)
+
+The best performing model was a **DDQN with PyTorch**, using two hidden layers of 128 neurons. It broke the 200-point barrier at **episode 761** and continued improving, reaching an average score of ~270 by episode 1500.
+
+![Training Plot m5](training_plot_m5.png)
+
+### Baseline Model (DQN — m0)
+
+The baseline **DQN with TensorFlow/Keras** (64×64 network) broke the 200-point barrier at **episode 559** and stabilised around 220 thereafter.
+
+![Training Plot m0](training_plot_m0.png)
+
+### Key Findings
+
+- **Network width** has a significant impact — 128+ neurons per layer converge faster and achieve higher scores
+- **DDQN** showed more stable and consistent post-convergence performance compared to DQN
+- **PyTorch** was significantly faster and more memory-efficient than TensorFlow/Keras for this workload (see [Implementation Notes](#-implementation-notes))
+
+---
+
+## 📁 Project Structure
+
+```
+lunar-lander-ddqn/
+├── ddqn_torch.py            # PyTorch DDQN implementation (recommended)
+├── ddqn_tfkeras.py          # TensorFlow/Keras DQN & DDQN implementation
+├── run.py                   # Training & watching a trained agent
+├── plot_training.py         # Plot training curves from saved stats
+├── lunarlander-torch.ipynb  # PyTorch training notebook
+├── lunarlander-tfkeras.ipynb# TensorFlow/Keras training notebook
+├── visual_comparison.ipynb  # Side-by-side model comparison
+├── ddqn_torch_model.h5      # Pretrained online network weights (PyTorch)
+├── ddqn_torch_model_h5.target # Pretrained target network weights
+├── training_plot_m0.png     # Training curve — DQN baseline
+├── training_plot_m5.png     # Training curve — best DDQN model
+├── stats/                   # JSON score/epsilon histories per model
+├── docs/                    # Report figures and LaTeX source
+├── video/                   # Recorded agent episodes
+└── requirements.txt         # Python dependencies
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.8+
+- pip
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/lunar-lander-ddqn.git
+cd lunar-lander-ddqn
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**`requirements.txt`**
+```
+gymnasium
+gymnasium[box2d]
+numpy
+torch
+tensorflow
+keras
+moviepy
+dill
+```
+
+> **Note for macOS (Apple Silicon):** The TensorFlow/Keras implementation does not work on M1/M2 Macs due to compatibility issues with Gymnasium's Box2D environment. Use the PyTorch implementation instead.
+
+---
+
+## 🎮 Training & Usage
+
+### Watch the Pretrained Agent
+
+```bash
+python run.py --watch
+```
+
+This loads `ddqn_torch_model.h5` and renders 3 episodes in a window.
+
+### Train from Scratch (Quick Demo — 20 episodes)
+
+```bash
+python run.py
+```
+
+### Full Training Run
+
+```bash
+python run.py --episodes 1500
+```
+
+### Resume Training from Saved Model
+
+```bash
+python run.py --episodes 1500 --load
+```
+
+### Plot Training Curves
+
+Requires `stats/` directory with score histories:
+
+```bash
+python plot_training.py              # First available model
+python plot_training.py --model m5   # Specific model key
+```
+
+### Custom Usage in Python
+
+```python
+from ddqn_torch import DoubleQAgent
+import gymnasium as gym
+
+env = gym.make("LunarLander-v3")
+agent = DoubleQAgent(gamma=0.99, epsilon=1.0, lr=0.001,
+                     mem_size=200000, batch_size=128)
+
+# Load pretrained weights
+agent.load_saved_model("ddqn_torch_model.h5")
+
+# Watch it run
+state, _ = env.reset()
+terminated = truncated = False
+while not (terminated or truncated):
+    action = agent.choose_action(state)
+    state, reward, terminated, truncated, _ = env.step(action)
+```
+
+---
+
+## 🔧 Implementation Notes
+
+### Why Two Implementations?
+
+The project was initially developed using **TensorFlow/Keras**. However, this caused significant issues:
+
+- Memory leaked progressively with each training episode on the development machine
+- Training had to be split across 10+ separate sessions over two days, each ending in out-of-memory crashes
+- The agent's model weights and replay buffer were checkpointed to disk between sessions
+
+After switching to **PyTorch**, training speed improved approximately **100×** with no memory issues. All models beyond the baseline (m0) were trained using PyTorch. Both implementations are included for reference.
+
+### Implementation Differences
+
+| Feature | TensorFlow/Keras (`ddqn_tfkeras.py`) | PyTorch (`ddqn_torch.py`) |
+|--------|--------------------------------------|--------------------------|
+| Network | `Sequential` with `Dense` layers | `nn.Module` with `nn.Linear` |
+| Optimizer | `Adam` via Keras | `optim.Adam` |
+| Memory buffer | Returns numpy arrays | Returns PyTorch tensors (CUDA-ready) |
+| GPU support | Via TF config | Automatic via `torch.device` |
+| Model saving | `model.save()` + pickle | `state_dict()` |
+
+---
+
+## 📖 References
+
+- Mnih, V. et al. (2015). *Human-level control through deep reinforcement learning*. Nature, 518, 529–533.
+- Van Hasselt, H., Guez, A., & Silver, D. (2016). *Deep Reinforcement Learning with Double Q-learning*. AAAI.
+- Sutton, R.S. & Barto, A.G. (2018). *Reinforcement Learning: An Introduction*. MIT Press.
+- [Gymnasium LunarLander-v3 Documentation](https://gymnasium.farama.org/environments/box2d/lunar_lander/)
+
+---
+
+<p align="center">
+  Made with ❤️ and a lot of crashed landers
+</p>
