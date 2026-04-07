@@ -12,13 +12,9 @@
   <b>Trained Agent Landing</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Untrained Agent Landing</b>
 </p>
 <p align="center">
-  <a href="https://youtu.be/csrk1gOcRPU">
-    <img src="https://img.youtube.com/vi/csrk1gOcRPU/maxresdefault.jpg" width="45%" alt="Trained Agent"/>
-  </a>
+  <video src="video/agentm5.mp4" width="45%" controls autoplay loop muted></video>
   &nbsp;&nbsp;
-  <a href="https://youtu.be/Jb_1M_E6ofE">
-    <img src="https://img.youtube.com/vi/Jb_1M_E6ofE/maxresdefault.jpg" width="45%" alt="Untrained Agent"/>
-  </a>
+  <video src="video/agentuntrained.mp4" width="45%" controls autoplay loop muted></video>
 </p>
 
 ---
