@@ -13,8 +13,8 @@
 </p>
 <p align="center">
   <video src="https://github.com/Groot-PAS/lunar-lander-ddqn/raw/main/video/agentm5.mp4" width="45%" controls></video>
-&nbsp;&nbsp;
-<video src="https://github.com/Groot-PAS/lunar-lander-ddqn/raw/main/video/agentuntrained.mp4" width="45%" controls></video>
+  &nbsp;&nbsp;
+  <video src="https://github.com/Groot-PAS/lunar-lander-ddqn/raw/main/video/agentuntrained.mp4" width="45%" controls></video>
 </p>
 
 ---
