@@ -11,11 +11,10 @@
 <p align="center">
   <b>Trained Agent Landing</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Untrained Agent Landing</b>
 </p>
-
 <p align="center">
-  <video src="https://github.com/Groot-PAS/lunar-lander-ddqn/raw/main/video/agentm5.mp4" width="45%" controls></video>
+  <video src="video/agentm5.mp4" width="45%" controls autoplay loop muted></video>
   &nbsp;&nbsp;
-  <video src="https://github.com/Groot-PAS/lunar-lander-ddqn/raw/main/video/agentuntrained.mp4" width="45%" controls></video>
+  <video src="video/agentuntrained.mp4" width="45%" controls autoplay loop muted></video>
 </p>
 
 ---
